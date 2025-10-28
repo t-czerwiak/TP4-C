@@ -1,4 +1,6 @@
-import { executeQuery } from '../services/dbServices.js';
+import { crearCancion as crearCancionService,
+        actualizarCancion as actualizarCancionService,
+        eliminarCancion as eliminarCancionService } from '../services/cancionService.js';
 
 export async function crearCancion(req, res) {
   const { nombre } = req.body;
@@ -7,14 +9,11 @@ export async function crearCancion(req, res) {
   }
 
   try {
-    const result = await executeQuery(
-      'INSERT INTO cancion (nombre) VALUES ($1) RETURNING *',
-      [nombre]
-    );
-    res.status(201).json({ message: 'Canción creada', data: result.rows[0] });
+    const nuevaCancion = await crearCancionService(nombre);
+    res.status(201).json({ message: 'Canción creada', data: nuevaCancion });
   } catch (error) {
     console.error('Error al crear canción:', error);
-    if (error.code === '23505') {
+    if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(409).json({ message: 'Canción ya existe' });
     }
     return res.status(500).json({ message: error.message });
@@ -28,16 +27,13 @@ export async function actualizarCancion(req, res) {
   }
 
   try {
-    const result = await executeQuery(
-      'UPDATE cancion SET nombre = $1 WHERE id = $2 RETURNING *',
-      [nombre, id]
-    );
+    const cancionActualizada = await actualizarCancionService(id, nombre);
 
-    if (result.rowCount === 0) {
+    if (!cancionActualizada) {
       return res.status(404).json({ message: 'Canción no encontrada' });
     }
 
-    res.json({ message: 'Canción actualizada', data: result.rows[0] });
+    res.json({ message: 'Canción actualizada', data: cancionActualizada });
   } catch (error) {
     console.error('Error al actualizar canción:', error);
     return res.status(500).json({ message: error.message });
@@ -51,16 +47,13 @@ export async function eliminarCancion(req, res) {
   }
 
   try {
-    const result = await executeQuery(
-      'DELETE FROM cancion WHERE id = $1 RETURNING *',
-      [id]
-    );
+    const numEliminadas = await eliminarCancionService(id);
 
-    if (result.rowCount === 0) {
+    if (numEliminadas === 0) {
       return res.status(404).json({ message: 'Canción no encontrada' });
     }
 
-    res.json({ message: 'Canción eliminada', data: result.rows[0] });
+    res.json({ message: 'Canción eliminada' });
   } catch (error) {
     console.error('Error al eliminar canción:', error);
     return res.status(500).json({ message: error.message });

@@ -1,29 +1,22 @@
-import { executeQuery } from '../services/dbServices.js';
+import { registrarEscucha as registrarEscuchaService } from '../services/escuchaService.js';
 
 export async function registrarEscucha(req, res) {
-  const { id } = req.body;  // id de canción
-  if (!id) {
+  const { id: cancionID } = req.body; // id de canción
+  const usuarioID = req.user.usuarioID; // id de usuario desde el token
+
+  if (!cancionID) {
     return res.status(400).json({ message: 'ID de canción requerido' });
   }
 
   try {
-    // Upsert atómico con ON CONFLICT (requiere unique constraint en DB)
-    const result = await executeQuery(
-      `INSERT INTO escucha (usuarioid, cancionid, reproducciones) 
-       VALUES ($1, $2, 1)
-       ON CONFLICT (usuarioid, cancionid) 
-       DO UPDATE SET reproducciones = escucha.reproducciones + 1
-       RETURNING *`,
-      [req.user.usuarioID, id]
-    );
+    const nuevaEscucha = await registrarEscuchaService(usuarioID, cancionID);
 
-    if (result.rowCount === 0) {
-      return res.status(500).json({ message: 'Error al registrar reproducción' });
-    }
-
-    res.json({ message: 'Reproducción registrada', data: result.rows[0] });
+    res.status(201).json({ message: 'Escucha registrada', data: nuevaEscucha });
   } catch (error) {
     console.error('Error en /escucho:', error);
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+       return res.status(404).json({ message: 'Usuario o Canción no encontrados' });
+    }
     return res.status(500).json({ message: error.message });
   }
 }
